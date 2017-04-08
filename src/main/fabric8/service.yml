@@ -1,0 +1,10 @@
+spec:
+  ports:
+  - name: openwire
+    port: 61616
+    protocol: TCP
+    targetPort: 61616
+  - name: openwire-ssl
+    port: 61617
+    protocol: TCP
+    targetPort: 61617

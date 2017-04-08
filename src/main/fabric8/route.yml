@@ -1,0 +1,10 @@
+metadata:
+  name: spring-boot-amq
+spec:
+  port:
+    targetPort: openwire-ssl
+  tls:
+    termination: passthrough
+  to:
+    kind: Service
+    name: spring-boot-amq

@@ -1,0 +1,10 @@
+apiVersion: "v1"
+kind: "ConfigMap"
+metadata:
+  name: spring-boot-amq-configmap
+data:
+  application.properties: |-
+    broker.name: ${KUBERNETES_NAME}
+    broker.dataDirectory: /mnt/${KUBERNETES_NAME}
+    broker.network.url: failover:(tcp://${SPRING_BOOT_AMQ_SERVICE_HOST}:${SPRING_BOOT_AMQ_SERVICE_PORT_OPENWIRE})
+    broker.ssl.keyStore: file:/etc/secret/broker.ks

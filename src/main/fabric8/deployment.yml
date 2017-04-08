@@ -1,0 +1,63 @@
+spec:
+  template:
+    spec:
+      serviceAccountName: spring-boot-amq-sa
+      containers:
+      - name: spring-boot-amq
+        env:
+        - name: SPRING_CONFIG_LOCATION
+          value: file:/etc/config/
+        - name: KUBERNETES_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: BROKER_NETWORK_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: spring-boot-amq-secret
+              key: broker.network.username
+        - name: BROKER_NETWORK_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: spring-boot-amq-secret
+              key: broker.network.password
+        - name: BROKER_SSL_KEY_STORE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: spring-boot-amq-secret
+              key: broker.ssl.key-store-password
+        ports:
+        - name: openwire
+          containerPort: 61616
+          protocol: TCP
+        - name: openwire-ssl
+          containerPort: 61617
+          protocol: TCP
+        resources:
+          requests:
+            cpu: "0.2"
+          limits:
+            cpu: "4.0"
+        volumeMounts:
+        - name: spring-boot-amq-secret-vol
+          mountPath: /etc/secret
+          readOnly: true
+        - name: spring-boot-amq-configmap-vol
+          mountPath: /etc/config
+          readOnly: true
+        - name: spring-boot-amq-vol
+          mountPath: /mnt
+          readOnly: false
+      volumes:
+      - name: spring-boot-amq-secret-vol
+        secret:
+          secretName: spring-boot-amq-secret
+          items:
+          - key: broker.ssl.key-store
+            path: broker.ks
+      - name: spring-boot-amq-configmap-vol
+        configMap:
+          name: spring-boot-amq-configmap
+      - name: spring-boot-amq-vol
+        persistentVolumeClaim:
+          claimName: spring-boot-amq-pvc
