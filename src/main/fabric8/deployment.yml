@@ -11,6 +11,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: AMQ_MESH_SERVICE_NAMESPACE
+          value: spring-boot-amq
         - name: BROKER_NETWORK_USERNAME
           valueFrom:
             secretKeyRef:

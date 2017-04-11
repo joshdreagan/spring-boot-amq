@@ -1,0 +1,162 @@
+<!--
+~ Copyright (C) Red Hat, Inc.
+~ http://www.redhat.com
+~
+~ Licensed under the Apache License, Version 2.0 (the "License");
+~ you may not use this file except in compliance with the License.
+~ You may obtain a copy of the License at
+~
+~    http://www.apache.org/licenses/LICENSE-2.0
+~
+~ Unless required by applicable law or agreed to in writing, software
+~ distributed under the License is distributed on an "AS IS" BASIS,
+~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+~ See the License for the specific language governing permissions and
+~ limitations under the License.
+-->
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:amq="http://activemq.apache.org/schema/core"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd 
+                           http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd">
+
+  <!--
+    This is super annoying... Spring boot does not do relaxed property bindings 
+    for XML files. Which means that when you deployed this to OpenShift, you 
+    wouldn't be able to override configurations with environment variables. 
+    Also, the broker element from ActiveMQ cannot use SPEL expressions directly 
+    for values. It will see the '#' symbol and try to lookup a bean ref. So the 
+    best workaround that I could come up with was to define beans for every 
+    value I want to configure (using SPEL expressions to lookup the 
+    @ConfigurationProperties annotated bean) and then ref those values in the 
+    broker elements/attributes. If I find a better way later, I'll come back and
+    update this.
+  -->
+  <bean name="broker.brokerName" class="java.lang.String">
+    <constructor-arg value="#{@brokerConfig.name}"/>
+  </bean>
+  <bean name="broker.dataDirectory" class="java.lang.String">
+    <constructor-arg value="#{@brokerConfig.dataDirectory}"/>
+  </bean>
+  <bean name="broker.persistenceAdapter.directory" class="java.lang.String">
+    <constructor-arg value="#{@brokerConfig.dataDirectory}/kahadb"/>
+  </bean>
+  <bean name="broker.networkConnector.brokerURL" class="java.lang.String">
+    <constructor-arg value="#{@brokerConfig.network.url}"/>
+  </bean>
+  <bean name="broker.networkConnector.username" class="java.lang.String">
+    <constructor-arg value="#{@brokerConfig.network.username}"/>
+  </bean>
+  <bean name="broker.networkConnector.password" class="java.lang.String">
+    <constructor-arg value="#{@brokerConfig.network.password}"/>
+  </bean>
+  <bean name="broker.sslContext.keyStore" class="java.lang.String">
+    <constructor-arg value="#{@brokerConfig.ssl.keyStore}"/>
+  </bean>
+  <bean name="broker.sslContext.keyStorePassword" class="java.lang.String">
+    <constructor-arg value="#{@brokerConfig.ssl.keyStorePassword}"/>
+  </bean>
+  <bean name="broker.transportConnectors.vm.uri" class="java.lang.String">
+    <constructor-arg value="vm://#{@brokerConfig.name}?create=false"/>
+  </bean>
+  <bean name="broker.transportConnectors.openwire.uri" class="java.lang.String">
+    <constructor-arg value="tcp://#{@brokerConfig.bindAddress}:61616?maximumConnections=1000"/>
+  </bean>
+  <bean name="broker.transportConnectors.openwire-ssl.uri" class="java.lang.String">
+    <constructor-arg value="ssl://#{@brokerConfig.bindAddress}:61617?maximumConnections=1000&amp;needClientAuth=false"/>
+  </bean>
+  
+  <broker xmlns="http://activemq.apache.org/schema/core" brokerName="#broker.brokerName" dataDirectory="#broker.dataDirectory" start="true" restartAllowed="false">
+
+    <destinationPolicy>
+      <policyMap>
+        <policyEntries>
+          <policyEntry topic=">" producerFlowControl="true">
+            <pendingMessageLimitStrategy>
+              <constantPendingMessageLimitStrategy limit="1000"/>
+            </pendingMessageLimitStrategy>
+          </policyEntry>
+          <policyEntry queue=">" producerFlowControl="true">
+            <networkBridgeFilterFactory>
+              <conditionalNetworkBridgeFilterFactory replayWhenNoConsumers="true"/>
+            </networkBridgeFilterFactory>
+          </policyEntry>
+        </policyEntries>
+      </policyMap>
+    </destinationPolicy>
+
+    <destinations>
+      <topic physicalName="ActiveMQ.Advisory.Connection"/>
+    </destinations>
+
+    <managementContext>
+      <managementContext createConnector="false"/>
+    </managementContext>
+
+    <ioExceptionHandler>
+      <defaultIOExceptionHandler ignoreNoSpaceErrors="false"/>
+    </ioExceptionHandler>
+
+    <persistenceAdapter>
+      <kahaDB directory="#broker.persistenceAdapter.directory"/>
+    </persistenceAdapter>
+
+    <plugins>
+      <simpleAuthenticationPlugin anonymousAccessAllowed="true" anonymousUser="anonymous" anonymousGroup="anonymous">
+        <users>
+          <authenticationUser username="admin" password="admin" groups="admin,user"/>
+          <authenticationUser username="user" password="password" groups="user"/>
+        </users>
+      </simpleAuthenticationPlugin>
+      <authorizationPlugin>
+        <map>
+          <authorizationMap>
+            <authorizationEntries>
+              <authorizationEntry queue=">" read="admin,user" write="admin,user" admin="admin,user"/>
+              <authorizationEntry topic=">" read="admin,user" write="admin,user" admin="admin,user"/>
+              <authorizationEntry topic="ActiveMQ.Advisory.>" read="admin,user,anonymous" write="admin,user" admin="admin,user" />
+            </authorizationEntries>
+            <tempDestinationAuthorizationEntry>
+              <tempDestinationAuthorizationEntry read="admin,user" write="admin,user" admin="admin,user"/>
+            </tempDestinationAuthorizationEntry>
+          </authorizationMap>
+        </map>
+      </authorizationPlugin>
+    </plugins>
+    
+    <sslContext>
+      <sslContext keyStore="#broker.sslContext.keyStore"
+                  keyStorePassword="#broker.sslContext.keyStorePassword"/>
+    </sslContext>
+
+    <systemUsage>
+      <systemUsage>
+        <memoryUsage>
+          <memoryUsage percentOfJvmHeap="70"/>
+        </memoryUsage>
+        <storeUsage>
+          <storeUsage limit="100 GB"/>
+        </storeUsage>
+        <tempUsage>
+          <tempUsage limit="50 GB"/>
+        </tempUsage>
+      </systemUsage>
+    </systemUsage>
+
+    <networkConnectors>
+      <networkConnector name="mesh"
+                        discoveryURI="#broker.networkConnector.brokerURL"
+                        userName="#broker.networkConnector.username"
+                        password="#broker.networkConnector.password"
+                        messageTTL="-1"
+                        consumerTTL="1"/>
+    </networkConnectors>
+
+    <transportConnectors>
+      <transportConnector name="vm" uri="#broker.transportConnectors.vm.uri"/>
+      <transportConnector name="openwire" uri="#broker.transportConnectors.openwire.uri" rebalanceClusterClients="true" updateClusterClients="true" updateClusterClientsOnRemove="false"/>
+      <transportConnector name="openwire+ssl" uri="#broker.transportConnectors.openwire-ssl.uri" rebalanceClusterClients="true" updateClusterClients="true" updateClusterClientsOnRemove="false"/>
+    </transportConnectors>
+  </broker>
+
+</beans>

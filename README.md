@@ -61,6 +61,12 @@ $ oc policy add-role-to-user view system:serviceaccount:spring-boot-amq:spring-b
 The example can be built and run on OpenShift using a single goal:
 
 ```
-$ cd $PROJECT_ROOT
 $ mvn fabric8:deploy
 ```
+
+## Notes
+
+- The [Secret](https://kubernetes.io/docs/concepts/configuration/secret/) values in the src/main/kube/secret.yaml file are base64 encoded strings. So you can use the `base64` utility (or whatever is your favorite) to encode them. Just be careful of the new-lines. Here's some examples:
+  - `echo -n 'password' | base64 --lines 0`
+  - `base64 --lines 0 --input ./broker.ks`
+- To establish the [NetworkConnector](http://activemq.apache.org/networks-of-brokers.html) inside of OpenShift, I used the `kube` discovery agent found in the `openshift-activemq-plugin` dependency. I could not find it in any of the maven repos, so you'll likely have to clone down the project [[https://github.com/jboss-openshift/openshift-ping](https://github.com/jboss-openshift/openshift-ping)], checkout the `1.1.1.Final` branch, and do a `mvn clean install` to install it into your local repo.

@@ -22,19 +22,24 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ImportResource;
 
 @SpringBootApplication
+@ImportResource("classpath:/spring/applicationContext.xml")
 public class Application {
-  
-  @Autowired(required = true)
+
+  @Autowired(required=true) 
   BrokerService broker;
+  
   
   @Bean
   ActiveMQConnectionFactory healthCheckConnectionFactory() throws Exception {
     return new ActiveMQConnectionFactory(broker.getVmConnectorURI());
   }
   
+  
+  
   public static void main(String[] args) throws Throwable {
-      SpringApplication.run(Application.class, args);
+    SpringApplication.run(Application.class, args);
   }
 }
